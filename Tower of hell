@@ -1,41 +1,168 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
    Name = "Tower of hell",
-   Icon = 0, -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
+   Icon = 0,
    LoadingTitle = "Calma que tá carregando",
    LoadingSubtitle = "by ryzespm",
-   ShowText = "Rayfield", -- for mobile users to unhide Rayfield, change if you'd like
-   Theme = "AmberGlow", -- Check https://docs.sirius.menu/rayfield/configuration/themes
-
-   ToggleUIKeybind = "K", -- The keybind to toggle the UI visibility (string like "K" or Enum.KeyCode)
-
+   ShowText = "Rayfield",
+   Theme = "AmberGlow",
+   ToggleUIKeybind = "K",
    DisableRayfieldPrompts = false,
-   DisableBuildWarnings = false, -- Prevents Rayfield from emitting warnings when the script has a version mismatch with the interface.
-
-   -- Heartbeat = "https://www.sentivel.com/api/heartbeat/<your token>", -- Pings your Sentivel heartbeat while Rayfield is open, so you can see whether your script is running
-
-   -- ScriptID = "sid_xxxxxxxxxxxx", -- Your Script ID from developer.sirius.menu — enables analytics, managed keys, and script hosting
-
+   DisableBuildWarnings = false,
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = nil, -- Create a custom folder for your hub/game
+      FolderName = nil,
       FileName = "Tower of hell"
    },
-
    Discord = {
-      Enabled = false, -- Prompt the user to join your Discord server if their executor supports it
-      Invite = "noinvitelink", -- The Discord invite code, do not include Discord.gg/. E.g. Discord.gg/ABCD would be ABCD
-      RememberJoins = true -- Set this to false to make them join the Discord every time they load it up
+      Enabled = false,
+      Invite = "noinvitelink",
+      RememberJoins = true
    },
-
-   KeySystem = false, -- Set this to true to use our key system
+   KeySystem = false,
    KeySettings = {
       Title = "Tower of hell",
       Subtitle = "Key System",
-      Note = "No method of obtaining the key is provided", -- Use this to tell the user how to get a key
-      FileName = "Key", -- It is recommended to use something unique, as other scripts using Rayfield may overwrite your key file
-      SaveKey = true, -- The user's key will be saved, but if you change the key, they will be unable to use your script
-      GrabKeyFromSite = false, -- If this is true, set Key below to the RAW site you would like Rayfield to get the key from
-      Key = {"Hello"} -- List of keys that the system will accept, can be RAW file links (pastebin, github, etc.) or simple strings ("hello", "key22")
+      Note = "No method of obtaining the key is provided",
+      FileName = "Key",
+      SaveKey = true,
+      GrabKeyFromSite = false,
+      Key = {"Hello"}
    }
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local Tab = Window:CreateTab("Principal", 4483452458)
+local Section = Tab:CreateSection("Funções")
+
+-- ============================
+-- HELPERS
+-- ============================
+local function getCharacter()
+	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	return char, char:WaitForChild("Humanoid"), char:WaitForChild("HumanoidRootPart")
+end
+
+-- ============================
+-- VELOCIDADE
+-- ============================
+Tab:CreateSlider({
+   Name = "Velocidade (WalkSpeed)",
+   Range = {16, 500},
+   Increment = 1,
+   Suffix = "speed",
+   CurrentValue = 16,
+   Flag = "WalkSpeed",
+   Callback = function(Value)
+		local char, hum = getCharacter()
+		hum.WalkSpeed = Value
+	end,
+})
+
+-- ============================
+-- GOD MODE
+-- ============================
+local godConnection = nil
+
+Tab:CreateToggle({
+   Name = "God Mode",
+   CurrentValue = false,
+   Flag = "GodMode",
+   Callback = function(Value)
+		if Value then
+			godConnection = RunService.Heartbeat:Connect(function()
+				local char, hum = getCharacter()
+				if hum and hum.Health < hum.MaxHealth then
+					hum.Health = hum.MaxHealth
+				end
+			end)
+		else
+			if godConnection then godConnection:Disconnect() godConnection = nil end
+		end
+	end,
+})
+
+-- ============================
+-- VOAR (Fly)
+-- ============================
+local flying = false
+local flySpeed = 50
+local flyConnection = nil
+
+local function startFly()
+	if flying then return end
+	flying = true
+	local char, hum, root = getCharacter()
+	hum.PlatformStand = false
+
+	local bodyGyro = Instance.new("BodyGyro")
+	bodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+	bodyGyro.P = 9e4
+	bodyGyro.Parent = root
+
+	local bodyVel = Instance.new("BodyVelocity")
+	bodyVel.Velocity = Vector3.zero
+	bodyVel.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+	bodyVel.Parent = root
+
+	flyConnection = RunService.RenderStepped:Connect(function()
+		local cam = workspace.CurrentCamera
+		bodyGyro.CFrame = CFrame.new(root.Position, cam.CFrame.Position) -- olha pra câmera
+
+		local moveDir = Vector3.zero
+		if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir += cam.CFrame.LookVector end
+		if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir -= cam.CFrame.LookVector end
+		if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir -= cam.CFrame.RightVector end
+		if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir += cam.CFrame.RightVector end
+		if UIS:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.new(0, 1, 0) end
+		if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir -= Vector3.new(0, 1, 0) end
+
+		bodyVel.Velocity = moveDir.Unit.Magnitude > 0 and moveDir.Unit * flySpeed or Vector3.zero
+	end)
+end
+
+local function stopFly()
+	flying = false
+	if flyConnection then flyConnection:Disconnect() flyConnection = nil end
+	local char, _, root = getCharacter()
+	for _, v in pairs(root:GetChildren()) do
+		if v:IsA("BodyGyro") or v:IsA("BodyVelocity") then v:Destroy() end
+	end
+end
+
+Tab:CreateToggle({
+   Name = "Voar (WASD + Space/Ctrl)",
+   CurrentValue = false,
+   Flag = "Fly",
+   Callback = function(Value)
+		if Value then startFly() else stopFly() end
+	end,
+})
+
+-- Velocidade do voo
+Tab:CreateSlider({
+   Name = "Velocidade do Voo",
+   Range = {10, 300},
+   Increment = 5,
+   Suffix = "speed",
+   CurrentValue = 50,
+   Flag = "FlySpeed",
+   Callback = function(Value)
+		flySpeed = Value
+	end,
+})
+
+-- ============================
+-- MISC
+-- ============================
+Tab:CreateButton({
+   Name = "Resetar Personagem",
+   Callback = function()
+		local char, hum = getCharacter()
+		hum.Health = 0
+	end,
 })
